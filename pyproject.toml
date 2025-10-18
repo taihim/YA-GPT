@@ -1,0 +1,9 @@
+[project]
+name = "ya-gpt"
+version = "1.0.0"
+description = "Yet another GPT implementation from scratch! Intended for educational use."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pydantic>=2.12.3",
+]
