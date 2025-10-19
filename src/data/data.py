@@ -1,6 +1,5 @@
 from src.tokenizer import simpleTokenizer
 from torch import stack, randint
-import torch
 
 class shakespeareDataset:
     def __init__(self, path="./src/data/shakespeare.txt", split_ratio: float = 0.9):
