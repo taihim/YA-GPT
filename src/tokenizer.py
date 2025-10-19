@@ -1,6 +1,5 @@
 
-class simple_tokenizer():
-
+class simpleTokenizer():
     def __init__(self, text: str) -> None:
         self.vocab = sorted(list(set(text)))    
 
