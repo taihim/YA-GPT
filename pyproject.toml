@@ -5,5 +5,7 @@ description = "Yet another GPT implementation from scratch! Intended for educati
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "datasets>=4.2.0",
     "pydantic>=2.12.3",
+    "torch>=2.9.0",
 ]
