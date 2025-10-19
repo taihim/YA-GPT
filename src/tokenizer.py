@@ -1,5 +1,6 @@
 
 class simpleTokenizer():
+    """Basic tokenize for character level encoding."""
     def __init__(self, text: str) -> None:
         self.vocab = sorted(list(set(text)))    
 
