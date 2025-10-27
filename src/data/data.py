@@ -1,28 +1,54 @@
-from src.tokenizer import simpleTokenizer
+from src.data.tokenizer import simpleTokenizer
 from torch import stack, randint
 
-class shakespeareDataset:
-    def __init__(self, path="./src/data/shakespeare.txt", split_ratio: float = 0.9):
+
+class GenericDataset:
+    def __init__(self, split_ratio:float = 0.9, batch_size: int = 4, ctx_len: int = 8) -> None:
+        self.split_ratio = split_ratio
+        self.batch_size = batch_size
+        self.ctx_len = ctx_len
+        
+        self.raw_text = ""
+        self.data = []
+
+        self.tokenizer = None
+
+        self.train_data = None
+        self.test_data = None
+        
+    def _prepare_data(self) -> None:
+        pass
+
+    def get_batch(self, split="train") -> None:
+        pass
+
+
+class ShakespeareDataset(GenericDataset):
+    def __init__(self) -> None:
+        super().__init__()
+        self._prepare_data()
+        
+    def _prepare_data(self, path="./src/data/shakespeare.txt"):
         with open(path, "r") as f:
             self.raw_text = f.read()
             self.tokenizer = simpleTokenizer(self.raw_text) 
             data = self.tokenizer.encode(self.raw_text)
 
-            n = int(split_ratio * len(self.raw_text))
+            n = int(self.split_ratio * len(self.raw_text))
             self.train_data = data[:n]
             self.test_data = data[n:]
 
-    def get_batch(self, split="train", ctx_len: int = 8, batch_size:int = 4):
+    def get_batch(self, split="train"):
         data = self.train_data if split=="train" else self.test_data
-        idx = randint(len(data) - ctx_len, (batch_size,), )
-        x = stack([data[i: i + ctx_len] for i in idx])
-        y = stack([data[i + 1: i + ctx_len + 1] for i in idx])
+        idx = randint(len(data) - self.ctx_len, (self.batch_size,), )
+        x = stack([data[i: i + self.ctx_len] for i in idx])
+        y = stack([data[i + 1: i + self.ctx_len + 1] for i in idx])
         
         return x, y
 
 
 if __name__ == "__main__":
-    xb,yb = shakespeareDataset().get_batch()
+    xb,yb = ShakespeareDataset().get_batch()
     print(xb.shape)
     print(yb.shape)
 
