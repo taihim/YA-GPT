@@ -52,6 +52,12 @@ if __name__ == "__main__":
     print(xb.shape)
     print(yb.shape)
 
-    for i in range(4):
-        for l in range (8):
-            print(f"When input is {xb[i, :l+1].tolist()}, target is {yb[i, l]}")
+    # for i in range(4):
+    #     for l in range (8):
+    #         print(f"When input is {xb[i, :l+1].tolist()}, target is {yb[i, l]}")
+
+    from src.model.gpt import VanillaGPT
+
+    out = VanillaGPT().forward(xb)
+
+    print(out.shape)
