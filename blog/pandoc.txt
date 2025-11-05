@@ -1,0 +1,1 @@
+pandoc BLOG.md -f markdown -t html -s -o blog.html --css=style.css --self-contained
