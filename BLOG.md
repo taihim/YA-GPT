@@ -42,9 +42,11 @@ This leads to a larger vocabulary but it lets us encode sequences of text in a s
 
 Modern models like GPT use the Byte Pair Encoding algorithm. GPT4 uses an improved version of BPE called cl100k_base.
 This tokenizer is more complicated to implement and the vocabulary is constructed greedily using various rules (approx. 100k vocab size). (Seperate blogpost on BPE) 
+OpenAI allows us to use their encoder via a python package called [tiktoken](https://github.com/openai/tiktoken).
 
+When we encode the same with BPE, we get this:
 
-What do we mean by encoding? It simply means converting characters/subwords as a number, since models can only operate on numbers. 
+`'Hello, world!' -> [9906, 11, 1917, 0]`
 
-
+So instead of 13 integers, we encoded it using 4 (almost a 3x reduction in tokens).
 
