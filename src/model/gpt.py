@@ -9,7 +9,6 @@ class VanillaGPT(nn.Module):
 
 
     def forward(self, x) -> None:
-        print(x.shape)
         B, T = x.shape
 
         print(arange(T))

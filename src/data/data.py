@@ -1,4 +1,4 @@
-from src.data.tokenizer import simpleTokenizer
+from src.data.tokenizer import SimpleTokenizer
 from torch import stack, randint
 
 
@@ -31,7 +31,7 @@ class ShakespeareDataset(GenericDataset):
     def _prepare_data(self, path="./src/data/shakespeare.txt"):
         with open(path, "r") as f:
             self.raw_text = f.read()
-            self.tokenizer = simpleTokenizer(self.raw_text) 
+            self.tokenizer = SimpleTokenizer(self.raw_text) 
             data = self.tokenizer.encode(self.raw_text)
 
             n = int(self.split_ratio * len(self.raw_text))
