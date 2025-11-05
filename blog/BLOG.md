@@ -45,9 +45,18 @@ Modern models like GPT use the Byte Pair Encoding algorithm. GPT4 uses an improv
 This tokenizer is more complicated to implement and the vocabulary is constructed greedily using various rules (approx. 100k vocab size). (Seperate blogpost on BPE) 
 OpenAI allows us to use their encoder via a python package called [tiktoken](https://github.com/openai/tiktoken).
 
-When we encode the same with BPE, we get this:
+When we encode the same with the gpt tokenizer, we get this:
 
 `'Hello, world!' -> [9906, 11, 1917, 0]`
 
-So instead of 13 integers, we encoded it using 4 (almost a 3x reduction in tokens).
+So instead of 13 integers, it encoded it using 4 (approx. a 3x reduction in tokens).
 
+
+# Model Architecture
+
+We will be using a decoder only architecture for our model. The decoder is suited to autoregressive generation tasks because of the mask applied to the input sequence (tokens can only see past tokens, not future). 
+We will define one decoder block then just link up multiple blocks of decoders.
+
+![](decoder.png)
+
+# Embeddings
