@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang xml:lang>
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>BLOG</title>
+  <style>
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+  </style>
+  <style type="text/css">
+body {
+font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+line-height: 1.6;
+color: #dcddde;
+background-color: #202020;
+padding: 2em 4em;
+max-width: 900px;
+margin: 0 auto;
+font-size: 16px;
+}
+
+h1, h2, h3, h4, h5, h6 {
+color: #dcddde;
+font-weight: 600;
+margin-top: 1.5em;
+margin-bottom: 0.5em;
+line-height: 1.3;
+}
+h1 {
+font-size: 2em;
+border-bottom: 1px solid #3a3a3a;
+padding-bottom: 0.3em;
+}
+h2 {
+font-size: 1.6em;
+}
+h3 {
+font-size: 1.4em;
+}
+
+p {
+margin: 1em 0;
+text-align: justify;
+}
+
+a {
+color: #7c3aed;
+text-decoration: none;
+}
+a:hover {
+text-decoration: underline;
+color: #9333ea;
+}
+
+code {
+background-color: #2d2d2d;
+color: #e6db74;
+padding: 2px 6px;
+border-radius: 3px;
+font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+font-size: 0.9em;
+}
+pre {
+background-color: #2d2d2d;
+padding: 1em;
+border-radius: 5px;
+overflow-x: auto;
+border: 1px solid #3a3a3a;
+margin: 1em 0;
+}
+pre code {
+background-color: transparent;
+padding: 0;
+color: #dcddde;
+}
+
+ul, ol {
+padding-left: 2em;
+margin: 1em 0;
+}
+ul {
+list-style-type: disc;
+}
+ul ul {
+list-style-type: circle;
+margin: 0.5em 0;
+}
+ul ul ul {
+list-style-type: square;
+}
+li {
+margin: 0.5em 0;
+padding-left: 0.3em;
+}
+ol {
+list-style-type: decimal;
+}
+
+blockquote {
+border-left: 4px solid #7c3aed;
+margin: 1em 0;
+padding-left: 1em;
+color: #b0b0b0;
+font-style: italic;
+}
+
+table {
+border-collapse: collapse;
+width: 100%;
+margin: 1em 0;
+}
+th, td {
+border: 1px solid #3a3a3a;
+padding: 0.5em 1em;
+text-align: left;
+}
+th {
+background-color: #2d2d2d;
+font-weight: 600;
+}
+tr:nth-child(even) {
+background-color: #252525;
+}
+
+hr {
+border: none;
+border-top: 1px solid #3a3a3a;
+margin: 2em 0;
+}
+
+img {
+max-width: 100%;
+height: auto;
+display: block;
+margin: 1em auto;
+border-radius: 5px;
+}
+
+p code, li code {
+background-color: #2d2d2d;
+color: #e6db74;
+}
+
+::selection {
+background-color: #7c3aed;
+color: white;
+}</style>
+</head>
+<body>
+<h1 id="introduction">Introduction</h1>
+<p>In this post, we will go over developing a character level language model that will generate shakespeare like text.</p>
+<p>The main way this differs from standard LLM’s that you may interact with daily is that we will process one character after each time step while the current standard is to process subword tokens (more on this in a bit).</p>
+<h1 id="data">Data</h1>
+<p>All ML models perform calculations on numbers. Natural language needs to be converted into a numerical form before we can do anything interesting with it. The process of converting text to a numerical format for processing is called encoding.</p>
+<p>Before we can encode our text, we first need to know all the possible values present in our input data. This collection is commonly called the ‘Vocabulary’ of the model. Just like a person can only properly speak/understand words from their vocabulary, a model can only generate elements that are present in its vocabulary.</p>
+<p>e.g. if our input data is just the text “Hello, world!”, our vocabulary would look like [‘H’, ‘e’, ‘l’, ‘o’, ‘,’, ’ ‘, ’w’, ‘r’, ‘d’, ‘!’]. Notice how we also take into account the space and punctuation characters.</p>
+<ul>
+<li>A model trained on this input would only be able to generate some combination of these characters.</li>
+</ul>
+<p>If we take a look at all the unique characters contained in the Shakespeare dataset we get this:</p>
+<pre><code>[&#39;\n&#39;, &#39; &#39;, &#39;!&#39;, &#39;$&#39;, &#39;&amp;&#39;, &quot;&#39;&quot;, &#39;,&#39;, &#39;-&#39;, &#39;.&#39;, &#39;3&#39;, &#39;:&#39;, &#39;;&#39;, &#39;?&#39;, &#39;A&#39;, &#39;B&#39;, &#39;C&#39;, &#39;D&#39;, &#39;E&#39;, &#39;F&#39;, &#39;G&#39;, &#39;H&#39;, &#39;I&#39;, &#39;J&#39;, &#39;K&#39;, &#39;L&#39;, &#39;M&#39;, &#39;N&#39;, &#39;O&#39;, &#39;P&#39;, &#39;Q&#39;, &#39;R&#39;, &#39;S&#39;, &#39;T&#39;, &#39;U&#39;, &#39;V&#39;, &#39;W&#39;, &#39;X&#39;, &#39;Y&#39;, &#39;Z&#39;, &#39;a&#39;, &#39;b&#39;, &#39;c&#39;, &#39;d&#39;, &#39;e&#39;, &#39;f&#39;, &#39;g&#39;, &#39;h&#39;, &#39;i&#39;, &#39;j&#39;, &#39;k&#39;, &#39;l&#39;, &#39;m&#39;, &#39;n&#39;, &#39;o&#39;, &#39;p&#39;, &#39;q&#39;, &#39;r&#39;, &#39;s&#39;, &#39;t&#39;, &#39;u&#39;, &#39;v&#39;, &#39;w&#39;, &#39;x&#39;, &#39;y&#39;, &#39;z&#39;]</code></pre>
+<p>So our model has access to the whole alphabet and many punctuation/formatting characters. It can generate quite a lot of different combinations with this larger vocabulary (total length 65).</p>
+<p>Now that we have a vocabulary for our model, we can define an encoding scheme to convert the data. We can just map each character to an integer value, starting from 0. This ends up looking like this:</p>
+<p><code>{&#39;\n&#39;: 0, &#39; &#39;: 1, &#39;!&#39;: 2, &#39;$&#39;: 3, &#39;&amp;&#39;: 4, &quot;&#39;&quot;: 5, &#39;,&#39;: 6, &#39;-&#39;: 7, &#39;.&#39;: 8, &#39;3&#39;: 9, &#39;:&#39;: 10, &#39;;&#39;: 11, &#39;?&#39;: 12, &#39;A&#39;: 13, &#39;B&#39;: 14, &#39;C&#39;: 15, &#39;D&#39;: 16, &#39;E&#39;: 17, &#39;F&#39;: 18, &#39;G&#39;: 19, &#39;H&#39;: 20, &#39;I&#39;: 21, &#39;J&#39;: 22, &#39;K&#39;: 23, &#39;L&#39;: 24, &#39;M&#39;: 25, &#39;N&#39;: 26, &#39;O&#39;: 27, &#39;P&#39;: 28, &#39;Q&#39;: 29, &#39;R&#39;: 30, &#39;S&#39;: 31, &#39;T&#39;: 32, &#39;U&#39;: 33, &#39;V&#39;: 34, &#39;W&#39;: 35, &#39;X&#39;: 36, &#39;Y&#39;: 37, &#39;Z&#39;: 38, &#39;a&#39;: 39, &#39;b&#39;: 40, &#39;c&#39;: 41, &#39;d&#39;: 42, &#39;e&#39;: 43, &#39;f&#39;: 44, &#39;g&#39;: 45, &#39;h&#39;: 46, &#39;i&#39;: 47, &#39;j&#39;: 48, &#39;k&#39;: 49, &#39;l&#39;: 50, &#39;m&#39;: 51, &#39;n&#39;: 52, &#39;o&#39;: 53, &#39;p&#39;: 54, &#39;q&#39;: 55, &#39;r&#39;: 56, &#39;s&#39;: 57, &#39;t&#39;: 58, &#39;u&#39;: 59, &#39;v&#39;: 60, &#39;w&#39;: 61, &#39;x&#39;: 62, &#39;y&#39;: 63, &#39;z&#39;: 64}</code></p>
+<p>And we can save the reverse mapping to convert back to text:</p>
+<p><code>{0: &#39;\n&#39;, 1: &#39; &#39;, 2: &#39;!&#39;, 3: &#39;$&#39;, 4: &#39;&amp;&#39;, 5: &quot;&#39;&quot;, 6: &#39;,&#39;, 7: &#39;-&#39;, 8: &#39;.&#39;, 9: &#39;3&#39;, 10: &#39;:&#39;, 11: &#39;;&#39;, 12: &#39;?&#39;, 13: &#39;A&#39;, 14: &#39;B&#39;, 15: &#39;C&#39;, 16: &#39;D&#39;, 17: &#39;E&#39;, 18: &#39;F&#39;, 19: &#39;G&#39;, 20: &#39;H&#39;, 21: &#39;I&#39;, 22: &#39;J&#39;, 23: &#39;K&#39;, 24: &#39;L&#39;, 25: &#39;M&#39;, 26: &#39;N&#39;, 27: &#39;O&#39;, 28: &#39;P&#39;, 29: &#39;Q&#39;, 30: &#39;R&#39;, 31: &#39;S&#39;, 32: &#39;T&#39;, 33: &#39;U&#39;, 34: &#39;V&#39;, 35: &#39;W&#39;, 36: &#39;X&#39;, 37: &#39;Y&#39;, 38: &#39;Z&#39;, 39: &#39;a&#39;, 40: &#39;b&#39;, 41: &#39;c&#39;, 42: &#39;d&#39;, 43: &#39;e&#39;, 44: &#39;f&#39;, 45: &#39;g&#39;, 46: &#39;h&#39;, 47: &#39;i&#39;, 48: &#39;j&#39;, 49: &#39;k&#39;, 50: &#39;l&#39;, 51: &#39;m&#39;, 52: &#39;n&#39;, 53: &#39;o&#39;, 54: &#39;p&#39;, 55: &#39;q&#39;, 56: &#39;r&#39;, 57: &#39;s&#39;, 58: &#39;t&#39;, 59: &#39;u&#39;, 60: &#39;v&#39;, 61: &#39;w&#39;, 62: &#39;x&#39;, 63: &#39;y&#39;, 64: &#39;z&#39;}</code></p>
+<p>So, using our new lookup table, we can now encode “Hello, World!” by iterating over the string and mapping each character to its integer representation:</p>
+<p><code>[20, 43, 50, 50, 53, 6, 2, 36, 54, 57, 51, 43, 3]</code></p>
+<p>So, with our character level encoding scheme, the encoded sequence has the same length as the input sequence. For transformer based models this is an issue because the attention mechanism scales quadratically with sequence length. Therefore it is important that we limit sequence length if we can while preserving the meaning of the text.</p>
+<p>Luckily, there is another tokenization scheme called subword tokenization (e.g. Byte Pair Encoding or Wordpiece) that attempts to address this issue. In this scheme, text is broken down into meaningful chunks that are larger than individual characters but smaller than full words. This leads to a larger vocabulary but it lets us encode sequences of text in a smaller amount of tokens.</p>
+<p>Modern models like GPT use the Byte Pair Encoding algorithm. GPT4 uses an improved version of BPE called cl100k_base. This tokenizer is more complicated to implement and the vocabulary is constructed greedily using various rules (approx. 100k vocab size). (Seperate blogpost on BPE) OpenAI allows us to use their encoder via a python package called <a href="https://github.com/openai/tiktoken">tiktoken</a>.</p>
+<p>When we encode the same with BPE, we get this:</p>
+<p><code>&#39;Hello, world!&#39; -&gt; [9906, 11, 1917, 0]</code></p>
+<p>So instead of 13 integers, we encoded it using 4 (almost a 3x reduction in tokens).</p>
+</body>
+</html>
