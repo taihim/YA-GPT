@@ -10,9 +10,7 @@ The process of converting text to a numerical format for processing is called en
 Before we can encode our text, we first need to know all the possible values present in our input data. This collection is commonly called the 'Vocabulary' of the model. 
 Just like a person can only properly speak/understand words from their vocabulary, a model can only generate elements that are present in its vocabulary. 
 
-e.g. if our input data is just the text "Hello, world!", our vocabulary would look like ['H', 'e', 'l', 'o', ',', ' ', 'w', 'r', 'd', '!']. Notice how we also take into account the space and punctuation characters.
-
-- A model trained on this input would only be able to generate some combination of these characters. 
+e.g. if our input data is just the text "Hello, world!", our vocabulary would look like ['H', 'e', 'l', 'o', ',', ' ', 'w', 'r', 'd', '!']. Notice how we also take into account the space and punctuation characters. A model trained on this input would only be able to generate some combination of these characters. 
 
 If we take a look at all the unique characters contained in the Shakespeare dataset we get this:
 
