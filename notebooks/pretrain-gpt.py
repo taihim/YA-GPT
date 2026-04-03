@@ -19,22 +19,22 @@ def _():
     return F, tiktoken, torch
 
 
-@app.cell
-def _():
-    chunks = []
-    with open("TinyStories-train.txt", "r") as f1:
-      for line in f1:
-        chunks.append(line)
+# @app.cell
+# def _():
+#     chunks = []
+#     with open("../data/TinyStories-train.txt", "r") as f1:
+#       for line in f1:
+#         chunks.append(line)
 
-    pretrain_text = "".join(chunks)
-    return
+#     pretrain_text = "".join(chunks)
+#     return
 
 
-@app.cell
-def _():
-    with open("pg100.txt", "r") as f2:
-      shakespeare_text = (f2.read())
-    return (shakespeare_text,)
+# @app.cell
+# def _():
+#     with open("../data/pg100.txt", "r") as f2:
+#       shakespeare_text = (f2.read())
+#     return (shakespeare_text,)
 
 
 @app.cell
@@ -45,6 +45,7 @@ def _(tiktoken):
 
 @app.cell
 def _(encoding, shakespeare_text):
+    shakespeare_text = ""
     encoded_text = encoding.encode(shakespeare_text)
     return (encoded_text,)
 
