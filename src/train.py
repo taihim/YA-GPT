@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 
+
 @dataclass
 class GPTConfig:
     block_size: int = 1024
@@ -13,14 +14,15 @@ class GPTConfig:
 
 class MLP(nn.Module):
     def __init__(self, config):
+        super().__init__()
         self.c_fc = nn.Linear(config.n_embd, config.n_embd * 4)
         self.gelu = nn.GELU(approximate='tanh')
-        self.proj = nn.Linear(4 * config.n_embd, config.n_embd)
+        self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
 
     def forward(self, x):
         x = self.c_fc(x)
         x = self.gelu(x)
-        x = self.proj(x)
+        x = self.c_proj(x)
         return x
 
 class CausalSelfAttention(nn.Module):
@@ -58,9 +60,9 @@ class CausalSelfAttention(nn.Module):
 class Block(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.ln1 = nn.LayerNorm(config.n_embd)
+        self.ln_1 = nn.LayerNorm(config.n_embd)
         self.attn = CausalSelfAttention(config)
-        self.ln2 = nn.LayerNorm(config.n_embd)
+        self.ln_2 = nn.LayerNorm(config.n_embd)
         self.mlp = MLP(config)
 
     def forward(self, x):
@@ -77,12 +79,56 @@ class GPT(nn.Module):
 
         self.transformer = nn.ModuleDict(dict(
             wte = nn.Embedding(config.vocab_size, config.n_embd),
-            wpe = nn.Embedding(config.vocab_size, config.n_embd),
+            wpe = nn.Embedding(config.block_size, config.n_embd),
             h = nn.ModuleList([Block(config) for _ in range(config.n_layer)]),
             ln_f = nn.LayerNorm(config.n_embd)
         ))
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
+
+    @classmethod
+    def from_pretrained(cls, model_type):
+        from transformers import GPT2LMHeadModel
+
+        config_args = {"gpt2": dict(n_layer=12, n_heads=12, n_embd=768)}["gpt2"] # 124M params
+
+        config_args["vocab_size"] = 50257
+        config_args["block_size"] = 1024
+
+        config = GPTConfig(**config_args)
+        model = GPT(config)
+
+        sd = model.state_dict()
+        sd_keys = sd.keys()
+
+        sd_keys = [k for k in sd_keys if not k.endswith(".attn.bias")]
+
+        model_hf = GPT2LMHeadModel.from_pretrained("gpt2")
+        sd_hf = model_hf.state_dict()
+
+        sd_keys_hf = sd_hf.keys()
+
+        sd_keys_hf = [k for k in sd_keys_hf if not k.endswith('.attn.masked_bias')] # ignore these, just a buffer
+        sd_keys_hf = [k for k in sd_keys_hf if not k.endswith('.attn.bias')] # same, just the mask (buffer)
+        transposed = ['attn.c_attn.weight', 'attn.c_proj.weight', 'mlp.c_fc.weight', 'mlp.c_proj.weight']
+        
+        # basically the openai checkpoints use a "Conv1D" module, but we only want to use a vanilla Linear
+        # this means that we have to transpose these weights when we import them
+        assert len(sd_keys_hf) == len(sd_keys), f"mismatched keys: {len(sd_keys_hf)} != {len(sd_keys)}"
+        for k in sd_keys_hf:
+            if any(k.endswith(w) for w in transposed):
+                # special treatment for the Conv1D weights we need to transpose
+                assert sd_hf[k].shape == sd[k].shape[::-1], f"transposed shape mismatch for {k}"
+                with torch.no_grad():
+                    sd[k].copy_(sd_hf[k].t())
+            else:
+                # vanilla copy over the other parameters
+                assert sd_hf[k].shape == sd[k].shape, f"shape mismatch for {k}: {sd_hf[k].shape} != {sd[k].shape}"
+                with torch.no_grad():
+                    sd[k].copy_(sd_hf[k])
+
+        return model
+
 
     def forward(self, idx):
         B, T = idx.size()
@@ -102,3 +148,8 @@ class GPT(nn.Module):
 
         return logits
 
+
+
+if __name__ == "__main__":
+    GPT.from_pretrained("gpt-2")
+    print("didn't crash, wooo")
