@@ -4,13 +4,22 @@ import torch.nn as nn
 from torch.nn import functional as F
 
 
+# @dataclass
+# class GPTConfig:
+#     block_size: int = 1024
+#     vocab_size: int = 50257
+#     n_layer: int = 12
+#     n_heads: int = 12
+#     n_embd: int = 768
+
 @dataclass
 class GPTConfig:
-    block_size: int = 1024
+    block_size: int = 512
     vocab_size: int = 50257
-    n_layer: int = 12
-    n_heads: int = 12
-    n_embd: int = 768
+    n_layer: int = 6
+    n_heads: int = 6
+    n_embd: int = 384
+
 
 class MLP(nn.Module):
     def __init__(self, config):
@@ -24,6 +33,7 @@ class MLP(nn.Module):
         x = self.gelu(x)
         x = self.c_proj(x)
         return x
+
 
 class CausalSelfAttention(nn.Module):
     def __init__(self, config):
@@ -147,6 +157,17 @@ class GPT(nn.Module):
         logits = self.lm_head(x) #(B, T, vocab_size)
 
         return logits
+
+    def generate(self, ctx):
+        #ctx will be a 1, 1 tensor
+        # we will pass this to the model and get a 1, 1, 384 tensor that will then go on to give 1, 1, 50257 logits
+        # we will then do softmax on the logits and pick the highest probability. or use torch.multinomial
+        logits = self.forward(ctx)
+        probs = torch.softmax(logits[:, -1, :])
+        output = torch.multinomial(probs, num_samples=2)
+        output = output[torch.randn(2)]
+
+        return output
 
 
 
