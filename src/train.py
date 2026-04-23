@@ -2,23 +2,23 @@ from dataclasses import dataclass
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-
-
-# @dataclass
-# class GPTConfig:
-#     block_size: int = 1024
-#     vocab_size: int = 50257
-#     n_layer: int = 12
-#     n_heads: int = 12
-#     n_embd: int = 768
+import math
 
 @dataclass
 class GPTConfig:
-    block_size: int = 512
+    block_size: int = 1024
     vocab_size: int = 50257
-    n_layer: int = 6
-    n_heads: int = 6
-    n_embd: int = 384
+    n_layer: int = 12
+    n_heads: int = 12
+    n_embd: int = 768
+
+# @dataclass
+# class GPTConfig:
+#     block_size: int = 512
+#     vocab_size: int = 50257
+#     n_layer: int = 6
+#     n_heads: int = 6
+#     n_embd: int = 384
 
 
 class MLP(nn.Module):
@@ -50,17 +50,17 @@ class CausalSelfAttention(nn.Module):
         B, T, C = x.size()
 
         kqv = self.c_attn(x)
-        k, q, v = kqv.split(config.n_embd, dim=2)
+        q, k, v = kqv.split(self.n_embd, dim=2)
 
         k = k.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
         q = q.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
         v = v.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
 
-        att = (q @ k.T(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
         att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
         att = F.softmax(att, dim = -1)
         y = att @ v
-        y = y.transpose(2, 1).continguous().view(B, T, C)
+        y = y.transpose(2, 1).contiguous().view(B, T, C)
 
         y = self.c_proj(y)
         return y
@@ -76,8 +76,8 @@ class Block(nn.Module):
         self.mlp = MLP(config)
 
     def forward(self, x):
-        x = x + self.attn(self.ln1(x))
-        x = x + self.mlp(self.ln2(x))
+        x = x + self.attn(self.ln_1(x))
+        x = x + self.mlp(self.ln_2(x))
 
         return x
 
@@ -159,18 +159,38 @@ class GPT(nn.Module):
         return logits
 
     def generate(self, ctx):
-        #ctx will be a 1, 1 tensor
+        print(ctx)
+        # ctx will be a 1, 1 tensor
         # we will pass this to the model and get a 1, 1, 384 tensor that will then go on to give 1, 1, 50257 logits
         # we will then do softmax on the logits and pick the highest probability. or use torch.multinomial
         logits = self.forward(ctx)
-        probs = torch.softmax(logits[:, -1, :])
-        output = torch.multinomial(probs, num_samples=2)
-        output = output[torch.randn(2)]
+        probs = torch.softmax(logits[:, -1, :], dim=-1)
+        topk_probs, topk_indices = torch.topk(probs, 50, dim=-1)
 
-        return output
+        output = torch.multinomial(topk_probs, num_samples=1)
+
+        xcol = torch.gather(topk_indices, -1, output)
+        # output = output
+
+        return torch.cat((ctx, xcol), dim=1)
 
 
+def generate_sentence(m, seed_str):
+    pass
+
+
+import tiktoken
+enc = tiktoken.get_encoding("gpt2")
 
 if __name__ == "__main__":
-    GPT.from_pretrained("gpt-2")
-    print("didn't crash, wooo")
+    m = GPT.from_pretrained("gpt-2")
+    torch.manual_seed(42)
+    inp = torch.tensor(enc.encode("Hello, I'm a language model."), dtype=torch.int).view(1, -1)
+    # print(torch.tensor(inp).view(1, -1))
+    max_len = 30
+    while inp.size(1) < max_len:
+        inp = m.generate(inp)
+    
+    print(enc.decode(inp.tolist()[-1]))
+    # print(torch.ones((1, 1)).size())
+    # print("didn't crash, wooo")
