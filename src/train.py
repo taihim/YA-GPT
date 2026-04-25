@@ -159,7 +159,6 @@ class GPT(nn.Module):
         return logits
 
     def generate(self, ctx):
-        print(ctx)
         # ctx will be a 1, 1 tensor
         # we will pass this to the model and get a 1, 1, 384 tensor that will then go on to give 1, 1, 50257 logits
         # we will then do softmax on the logits and pick the highest probability. or use torch.multinomial
