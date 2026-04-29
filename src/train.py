@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 import math
+import time
 
 @dataclass
 class GPTConfig:
@@ -27,6 +28,7 @@ class MLP(nn.Module):
         self.c_fc = nn.Linear(config.n_embd, config.n_embd * 4)
         self.gelu = nn.GELU(approximate='tanh')
         self.c_proj = nn.Linear(4 * config.n_embd, config.n_embd)
+        self.c_proj.CUSTOM_SCALE_INIT = 1
 
     def forward(self, x):
         x = self.c_fc(x)
@@ -43,6 +45,7 @@ class CausalSelfAttention(nn.Module):
 
         self.c_attn = nn.Linear(config.n_embd, 3 * config.n_embd)
         self.c_proj = nn.Linear(config.n_embd, config.n_embd) 
+        self.c_proj.CUSTOM_SCALE_INIT = 1
 
         self.register_buffer("bias", torch.tril(torch.ones(config.block_size, config.block_size)).view(1, 1, config.block_size, config.block_size))
         
@@ -103,7 +106,10 @@ class GPT(nn.Module):
 
     def _init_weights(self, module):
         if isinstance(module, nn.Linear):
-            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            std = 0.02
+            if hasattr(module, "CUSTOM_SCALE_INIT"):
+                std *= (self.config.n_layer * 2) ** -0.5 # each layer has 2 blocks that contribute to the residual. 1 in the MLP and the other in the attention block
+            torch.nn.init.normal_(module.weight, mean=0.0, std=std)
             if module.bias is not None:
                 torch.nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Embedding):
@@ -212,11 +218,11 @@ if __name__ == "__main__":
     device = "cpu"
     if torch.cuda.is_available():
         device = "cuda"
+        torch.backends.cuda.matmul.fp32_precision = "ieee"
+
     elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         device = "mps"
-    
     print(f"Using device: {device}")
-
     m = GPT(GPTConfig())
     # m = GPT.from_pretrained("gpt-2")
 
@@ -228,16 +234,25 @@ if __name__ == "__main__":
     optimizer = torch.optim.AdamW(m.parameters(), lr=3e-4)
 
     for i in range(50):
+        t0 = time.time()
         optimizer.zero_grad()
 
         xb, yb = ds.get_batch()
         xb, yb = xb.to(device), yb.to(device)
         logits, loss = m(xb, yb)
-        
+        # import code; code.interact(local=locals()) # interrupts execution at this point and creates an interactive terminal with all variables and data available
+        # by default everything is being calculated at FP32
+        # TF32 is an nvidia optimization that reduces precision by dropping the mantissa bits but offers much higher throughput
         loss.backward()
         optimizer.step()
 
-        print(f"Loss at step {i}: {loss}")
+        if device == "cuda":
+            torch.cuda.synchronize() # waits for gpu work to end before cpu continues 
+        t1 = time.time()
+        dt = (t1-t0)*1000
+        tokens_per_sec = (ds.batch_size * ds.ctx_len) / (t1 - t0)
+
+        print(f"Loss at step {i}: {loss}, dt: {dt}, tok/s: {tokens_per_sec}")
 
 
 
