@@ -140,7 +140,7 @@ class GPT(nn.Module):
         return model
 
 
-    def forward(self, idx):
+    def forward(self, idx, targets=None):
         B, T = idx.size()
         pos = torch.arange(0, T, dtype=torch.long, device=idx.device)
         pos_emb = self.transformer.wpe(pos)
@@ -156,21 +156,31 @@ class GPT(nn.Module):
 
         logits = self.lm_head(x) #(B, T, vocab_size)
 
-        return logits
+        loss = None
+        if targets is not None:
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), targets.view(-1))
+
+        return logits, loss
 
     def generate(self, ctx):
         # ctx will be a 1, 1 tensor
         # we will pass this to the model and get a 1, 1, 384 tensor that will then go on to give 1, 1, 50257 logits
         # we will then do softmax on the logits and pick the highest probability. or use torch.multinomial
-        logits = self.forward(ctx)
+        logits, _ = self.forward(ctx)
         probs = torch.softmax(logits[:, -1, :], dim=-1)
+        
+        # gives us the top 50 probs and their indices out of the B, vocab_size tensor
+        # so it will be B, 50. i.e. a tensor of 50 values
+        # and indices will be the index value of those probs in the original B, vocab_size tensor
         topk_probs, topk_indices = torch.topk(probs, 50, dim=-1)
 
+        # samples from our 50 probs
         output = torch.multinomial(topk_probs, num_samples=1)
 
+        # just equivalent of getting topk_ind[:, out]
         xcol = torch.gather(topk_indices, -1, output)
-        # output = output
 
+        # returns B, len(ctx) + 1
         return torch.cat((ctx, xcol), dim=1)
 
 
@@ -181,15 +191,45 @@ def generate_sentence(m, seed_str):
 import tiktoken
 enc = tiktoken.get_encoding("gpt2")
 
+from src.data import ShakespeareDataset
+
 if __name__ == "__main__":
-    m = GPT.from_pretrained("gpt-2")
-    torch.manual_seed(42)
-    inp = torch.tensor(enc.encode("Hello, I'm a language model."), dtype=torch.int).view(1, -1)
-    # print(torch.tensor(inp).view(1, -1))
-    max_len = 30
+    torch.manual_seed(1337)
+
+    device = "cpu"
+    if torch.cuda.is_available():
+        device = "cuda"
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        device = "mps"
+    
+    print(f"Using device: {device}")
+
+    m = GPT(GPTConfig())
+    # m = GPT.from_pretrained("gpt-2")
+
+    m.to(device)
+    
+    ds = ShakespeareDataset(tokenizer="gpt2")
+    # ds = ShakespeareDataset()
+
+    optimizer = torch.optim.AdamW(m.parameters(), lr=3e-4)
+
+    for i in range(50):
+        optimizer.zero_grad()
+
+        xb, yb = ds.get_batch()
+        logits, loss = m(xb, yb)
+        
+        loss.backward()
+        optimizer.step()
+
+        print(f"Loss at step {i}: {loss}")
+
+
+
+    inp = torch.tensor(enc.encode("Alan Turing theorized that computers would one day become"), dtype=torch.int).view(1, -1).to(device)
+    max_len = 50
     while inp.size(1) < max_len:
         inp = m.generate(inp)
     
     print(enc.decode(inp.tolist()[-1]))
-    # print(torch.ones((1, 1)).size())
-    # print("didn't crash, wooo")

@@ -1,6 +1,7 @@
 from src.data.tokenizer import SimpleTokenizer
 from torch import stack, randint
-
+import tiktoken
+import torch
 
 class GenericDataset:
     def __init__(self, split_ratio:float = 0.9, batch_size: int = 4, ctx_len: int = 8) -> None:
@@ -24,17 +25,23 @@ class GenericDataset:
 
 
 class ShakespeareDataset(GenericDataset):
-    def __init__(self) -> None:
+    def __init__(self, tokenizer="char_level") -> None:
         super().__init__()
+        self.tokenizer = tokenizer
         self._prepare_data()
         
     def _prepare_data(self, path="./src/data/shakespeare.txt"):
         with open(path, "r") as f:
             self.raw_text = f.read()
-            self.tokenizer = SimpleTokenizer(self.raw_text) 
-            data = self.tokenizer.encode(self.raw_text)
 
-            n = int(self.split_ratio * len(self.raw_text))
+            if self.tokenizer == "char_level":
+                self.tokenizer = SimpleTokenizer(self.raw_text)
+                data = self.tokenizer.encode(self.raw_text)
+            elif self.tokenizer == "gpt2":
+                self.tokenizer = tiktoken.get_encoding("gpt2")
+                data = torch.tensor(self.tokenizer.encode(self.raw_text))
+            
+            n = int(self.split_ratio * len(data))
             self.train_data = data[:n]
             self.test_data = data[n:]
 
