@@ -96,6 +96,19 @@ class GPT(nn.Module):
 
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size, bias=False)
 
+        # weight sharing scheme
+        self.transformer.wte.weight = self.lm_head.weight
+
+        self.apply(self._init_weights)
+
+    def _init_weights(self, module):
+        if isinstance(module, nn.Linear):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+            if module.bias is not None:
+                torch.nn.init.zeros_(module.bias)
+        elif isinstance(module, nn.Embedding):
+            torch.nn.init.normal_(module.weight, mean=0.0, std=0.02)
+
     @classmethod
     def from_pretrained(cls, model_type):
         from transformers import GPT2LMHeadModel
@@ -218,6 +231,7 @@ if __name__ == "__main__":
         optimizer.zero_grad()
 
         xb, yb = ds.get_batch()
+        xb, yb = xb.to(device), yb.to(device)
         logits, loss = m(xb, yb)
         
         loss.backward()

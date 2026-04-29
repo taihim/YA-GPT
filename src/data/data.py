@@ -25,9 +25,10 @@ class GenericDataset:
 
 
 class ShakespeareDataset(GenericDataset):
-    def __init__(self, tokenizer="char_level") -> None:
+    def __init__(self, tokenizer="char_level", device="cpu") -> None:
         super().__init__()
         self.tokenizer = tokenizer
+        self.device = device
         self._prepare_data()
         
     def _prepare_data(self, path="./src/data/shakespeare.txt"):
@@ -39,7 +40,7 @@ class ShakespeareDataset(GenericDataset):
                 data = self.tokenizer.encode(self.raw_text)
             elif self.tokenizer == "gpt2":
                 self.tokenizer = tiktoken.get_encoding("gpt2")
-                data = torch.tensor(self.tokenizer.encode(self.raw_text))
+                data = torch.tensor(self.tokenizer.encode(self.raw_text)).to(self.device)
             
             n = int(self.split_ratio * len(data))
             self.train_data = data[:n]
