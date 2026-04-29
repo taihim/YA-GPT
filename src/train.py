@@ -225,9 +225,11 @@ if __name__ == "__main__":
     print(f"Using device: {device}")
     m = GPT(GPTConfig())
     # m = GPT.from_pretrained("gpt-2")
-
     m.to(device)
-    
+
+    if device == "cuda":
+        m = torch.compile(m)
+
     ds = ShakespeareDataset(tokenizer="gpt2")
     # ds = ShakespeareDataset()
 
@@ -239,6 +241,9 @@ if __name__ == "__main__":
 
         xb, yb = ds.get_batch()
         xb, yb = xb.to(device), yb.to(device)
+        # with torch.autocast(device_type=device, dtype=torch.bfloat16): # only available on ampere and newer server cards
+        #     logits, loss = m(xb, yb)
+
         logits, loss = m(xb, yb)
         # import code; code.interact(local=locals()) # interrupts execution at this point and creates an interactive terminal with all variables and data available
         # by default everything is being calculated at FP32
