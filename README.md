@@ -11,4 +11,12 @@ uv sync
 ```
 
 The shell provides Python 3.13, uv, the C++ runtime required by PyTorch, and
-the NixOS NVIDIA driver library path used by CUDA.
+the NixOS NVIDIA driver library path and CUDA compiler tools used by Triton.
+
+With direnv installed, allow the project once to enter the shell and load local
+variables from `.env` automatically:
+
+```sh
+direnv allow
+uv sync
+```
