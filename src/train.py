@@ -235,7 +235,7 @@ if __name__ == "__main__":
 
     optimizer = torch.optim.AdamW(m.parameters(), lr=3e-4)
 
-    for i in range(50):
+    for i in range(10):
         t0 = time.time()
         optimizer.zero_grad()
 
