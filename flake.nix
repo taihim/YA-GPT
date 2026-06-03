@@ -18,13 +18,22 @@
       devShells = forAllSystems (
         system:
         let
-          pkgs = import nixpkgs { inherit system; };
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfreePredicate =
+              pkg:
+              builtins.elem (nixpkgs.lib.getName pkg) [
+                "cuda_nvcc"
+              ];
+          };
           python = pkgs.python313;
+          cudaNvcc = pkgs.cudaPackages.cuda_nvcc;
         in
         {
           default = pkgs.mkShell {
             packages = [
               python
+              cudaNvcc
               pkgs.uv
               pkgs.git
               pkgs.pkg-config
@@ -35,6 +44,7 @@
             UV_PYTHON = "${python}/bin/python";
             UV_PYTHON_DOWNLOADS = "never";
             TRITON_LIBCUDA_PATH = "/run/opengl-driver/lib";
+            TRITON_PTXAS_PATH = "${cudaNvcc}/bin/ptxas";
             LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath [
               pkgs.zlib
               pkgs.stdenv.cc.cc.lib
