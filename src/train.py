@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import inspect
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
@@ -59,10 +60,12 @@ class CausalSelfAttention(nn.Module):
         q = q.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
         v = v.view(B, T, self.n_heads, C // self.n_heads).transpose(1, 2)
 
-        att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
-        att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
-        att = F.softmax(att, dim = -1)
-        y = att @ v
+        # att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
+        # att = att.masked_fill(self.bias[:, :, :T, :T] == 0, float('-inf'))
+        # att = F.softmax(att, dim = -1)
+        # y = att @ v
+        y = F.scaled_dot_product_attention(q, k, v, is_causal=True)
+        
         y = y.transpose(2, 1).contiguous().view(B, T, C)
 
         y = self.c_proj(y)
@@ -158,6 +161,34 @@ class GPT(nn.Module):
 
         return model
 
+    def configure_optimizers(self, weight_decay, learning_rate, device):
+        # get all params that require grad
+        param_dict = {pn: p for pn, p in self.named_parameters()}
+        param_dict = {pn:p for pn, p in param_dict.items() if p.requires_grad}
+
+        # create optim groups. Any 2D params will be weight decayed, otherwise no
+        # i.e. all weight tensors in matmuls + embeddings will decay, all biases and layernorms don't.
+        decay_params = [p for n, p in param_dict.items() if p.dim() >= 2]
+        nodecay_params = [p for n, p in param_dict.items() if p.dim() < 2]
+
+        optim_groups = [
+            {"params": decay_params, "weight_decay": weight_decay},
+            {"params": nodecay_params, "weight_decay": 0.0}
+        ]
+
+        num_decay_params = sum(p.numel() for p in decay_params)
+        num_nodecay_params = sum(p.numel() for p in nodecay_params)
+
+        print(f"num decayed params: {len(decay_params)}, with {num_decay_params} params")
+        print(f"num non decayed params: {len(nodecay_params)}, with {num_nodecay_params} params")
+
+        fused_available = "fused" in inspect.signature(torch.optim.AdamW).parameters
+        use_fused = fused_available and "cuda" in device
+        print(f"Using fused AdamW: {use_fused}")
+        optimizer = torch.optim.AdamW(optim_groups, lr=learning_rate, betas=(0.9, 0.95), eps=1e-8)
+
+        return optimizer
+
 
     def forward(self, idx, targets=None):
         B, T = idx.size()
@@ -212,30 +243,46 @@ enc = tiktoken.get_encoding("gpt2")
 
 from src.data import ShakespeareDataset
 
+max_lr = 6e-4
+min_lr = max_lr * 0.1
+warmup_steps = 100
+max_steps = 1000
+def get_lr(it):
+    if it < warmup_steps:
+        return max_lr * (it + 1) / warmup_steps
+    if it > max_steps:
+        return min_lr
+    decay_ratio = (it - warmup_steps) / (max_steps - warmup_steps)
+    assert 0 <= decay_ratio <= 1
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
+    return min_lr + coeff * (max_lr - min_lr)
+
+
 if __name__ == "__main__":
     torch.manual_seed(1337)
 
     device = "cpu"
     if torch.cuda.is_available():
         device = "cuda"
-        torch.backends.cuda.matmul.fp32_precision = "ieee"
+        # torch.backends.cuda.matmul.fp32_precision = "ieee"
+        torch.set_float32_matmul_precision('high')
 
     elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
         device = "mps"
     print(f"Using device: {device}")
-    m = GPT(GPTConfig())
+    m = GPT(GPTConfig(vocab_size=50304))
     # m = GPT.from_pretrained("gpt-2")
     m.to(device)
 
     if device == "cuda":
         m = torch.compile(m)
 
-    ds = ShakespeareDataset(tokenizer="gpt2")
+    ds = ShakespeareDataset(tokenizer="gpt2", batch_size=16, ctx_len=256)
     # ds = ShakespeareDataset()
 
-    optimizer = torch.optim.AdamW(m.parameters(), lr=3e-4)
-
-    for i in range(10):
+    # optimizer = torch.optim.AdamW(m.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8)
+    optimizer = m.configure_optimizers(weight_decay=0.1, learning_rate=max_lr, device=device)
+    for step in range(max_steps):
         t0 = time.time()
         optimizer.zero_grad()
 
@@ -249,6 +296,11 @@ if __name__ == "__main__":
         # by default everything is being calculated at FP32
         # TF32 is an nvidia optimization that reduces precision by dropping the mantissa bits but offers much higher throughput
         loss.backward()
+        norm = torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0)
+
+        lr = get_lr(step)
+        for param_group in optimizer.param_groups:
+            param_group["lr"] = lr
         optimizer.step()
 
         if device == "cuda":
@@ -257,12 +309,14 @@ if __name__ == "__main__":
         dt = (t1-t0)*1000
         tokens_per_sec = (ds.batch_size * ds.ctx_len) / (t1 - t0)
 
-        print(f"Loss at step {i}: {loss}, dt: {dt}, tok/s: {tokens_per_sec}")
+        print(f"Loss at step {step}: {loss: 0.3f}, norm:{norm: .2f}, lr: {lr: .5f}, dt: {dt: 0.2f}, tok/s: {tokens_per_sec: 0.2f}")
 
+    # print(m.state_dict().keys())
 
+    # inp = torch.tensor(enc.encode("Alan Turing theorized that computers would one day become"), dtype=torch.int).view(1, -1).to(device)
+    inp = torch.tensor(enc.encode("To be "), dtype=torch.int).view(1, -1).to(device)
 
-    inp = torch.tensor(enc.encode("Alan Turing theorized that computers would one day become"), dtype=torch.int).view(1, -1).to(device)
-    max_len = 50
+    max_len = 40
     while inp.size(1) < max_len:
         inp = m.generate(inp)
     

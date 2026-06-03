@@ -6,3 +6,4 @@ data/
 __marimo__/
 *.pth
 .direnv/
+.agents/

@@ -25,8 +25,15 @@ class GenericDataset:
 
 
 class ShakespeareDataset(GenericDataset):
-    def __init__(self, tokenizer="char_level", device="cpu") -> None:
-        super().__init__()
+    def __init__(
+        self,
+        tokenizer="char_level",
+        device="cpu",
+        split_ratio: float = 0.9,
+        batch_size: int = 4,
+        ctx_len: int = 8,
+    ) -> None:
+        super().__init__(split_ratio=split_ratio, batch_size=batch_size, ctx_len=ctx_len)
         self.tokenizer = tokenizer
         self.device = device
         self._prepare_data()
