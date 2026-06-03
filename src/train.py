@@ -277,8 +277,7 @@ if __name__ == "__main__":
     if device == "cuda":
         m = torch.compile(m)
 
-    ds = ShakespeareDataset(tokenizer="gpt2", batch_size=4, ctx_len=1024)
-    # ds = ShakespeareDataset()
+    ds = ShakespeareDataset(tokenizer="gpt2", batch_size=32, ctx_len=256)
 
     # optimizer = torch.optim.AdamW(m.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8)
     optimizer = m.configure_optimizers(weight_decay=0.1, learning_rate=max_lr, device=device)
@@ -288,10 +287,10 @@ if __name__ == "__main__":
 
         xb, yb = ds.get_batch()
         xb, yb = xb.to(device), yb.to(device)
-        # with torch.autocast(device_type=device, dtype=torch.bfloat16): # only available on ampere and newer server cards
-        #     logits, loss = m(xb, yb)
-
-        logits, loss = m(xb, yb)
+        with torch.autocast(device_type=device, dtype=torch.bfloat16): # only available on ampere and newer server cards (works on 5060)
+            logits, loss = m(xb, yb)
+        # logits, loss = m(xb, yb)
+        
         # import code; code.interact(local=locals()) # interrupts execution at this point and creates an interactive terminal with all variables and data available
         # by default everything is being calculated at FP32
         # TF32 is an nvidia optimization that reduces precision by dropping the mantissa bits but offers much higher throughput
