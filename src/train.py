@@ -277,7 +277,7 @@ if __name__ == "__main__":
     if device == "cuda":
         m = torch.compile(m)
 
-    ds = ShakespeareDataset(tokenizer="gpt2", batch_size=16, ctx_len=256)
+    ds = ShakespeareDataset(tokenizer="gpt2", batch_size=4, ctx_len=1024)
     # ds = ShakespeareDataset()
 
     # optimizer = torch.optim.AdamW(m.parameters(), lr=3e-4, betas=(0.9, 0.95), eps=1e-8)
