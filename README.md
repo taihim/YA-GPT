@@ -20,3 +20,5 @@ variables from `.env` automatically:
 direnv allow
 uv sync
 ```
+
+update for cpu inference
