@@ -24,3 +24,14 @@ uv sync
 update for cpu inference
 write inference engine in c++ (llama.cpp and nanochat inspiration)
 also create own binary model format like GGUF
+
+ToDO:
+train SLP with numpy
+dump matrix to binary format
+write binary file parser in c++
+write matrix mult in c++
+write sigmoid in c++
+prediction = sigmoid(x * W + b)
+
+read weight matrix from file
+perform prediction calculation + output it
