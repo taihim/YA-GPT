@@ -22,3 +22,5 @@ uv sync
 ```
 
 update for cpu inference
+write inference engine in c++ (llama.cpp and nanochat inspiration)
+also create own binary model format like GGUF
