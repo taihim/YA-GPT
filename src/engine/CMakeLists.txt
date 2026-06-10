@@ -17,9 +17,9 @@ FetchContent_Declare(json
 )
 FetchContent_MakeAvailable(json)
 
-add_executable(translate-server src/main.cpp)
+add_executable(model-server src/main.cpp)
 
-target_link_libraries(translate-server PRIVATE
+target_link_libraries(model-server PRIVATE
     httplib::httplib
     nlohmann_json::nlohmann_json
 )
