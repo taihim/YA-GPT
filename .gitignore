@@ -8,3 +8,4 @@ __marimo__/
 .direnv/
 .agents/
 build/
+*.o
