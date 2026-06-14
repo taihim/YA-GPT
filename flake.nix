@@ -34,6 +34,9 @@
             packages = [
               python
               cudaNvcc
+              pkgs.clang
+              pkgs.cmake
+              pkgs.ninja
               pkgs.uv
               pkgs.git
               pkgs.pkg-config
