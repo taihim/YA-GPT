@@ -156,9 +156,9 @@ int main() {
                     }
                 }
                 // std::cout << "-------------------------------\n";
-            };
-        };
-    };
+            }
+        }
+    }
     auto end3 = std::chrono::steady_clock::now();
     auto ns3 = std::chrono::duration_cast<std::chrono::nanoseconds>(end3 - start3).count();
 
