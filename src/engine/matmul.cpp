@@ -116,6 +116,8 @@ int main() {
     const int tile_size = 16;
     auto start3 = std::chrono::steady_clock::now();
     // tile the matrix, no transpose
+    std::vector<float> mat3 = transpose(mat2, N, P);
+
     auto tiledM = M / tile_size;
     auto tiledN = N / tile_size;
     auto tiledP = P / tile_size;
@@ -151,7 +153,8 @@ int main() {
                             // output has row of A and col of B
 
                             // std::cout << "A: " << (i*tile_size + ii) * N + (k*tile_size + kk) << "| B: " << (k*tile_size + kk) * P + (j*tile_size + jj) << std::endl;
-                            res3[(i*tile_size+ii) * P + (j*tile_size+jj)] += mat1[(i*tile_size + ii) * N + (k*tile_size + kk)] * mat2[(k*tile_size + kk) * P + (j*tile_size + jj)];
+                            // res3[(i*tile_size+ii) * P + (j*tile_size+jj)] += mat1[(i*tile_size + ii) * N + (k*tile_size + kk)] * mat2[(k*tile_size + kk) * P + (j*tile_size + jj)];
+                            res3[(i*tile_size+ii) * P + (j*tile_size+jj)] += mat1[(i*tile_size + ii) * N + (k*tile_size + kk)] * mat3[(j*tile_size + jj) * P + (k*tile_size + kk)];
                         }
                     }
                 }
