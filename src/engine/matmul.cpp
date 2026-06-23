@@ -96,7 +96,7 @@ int main() {
         };
     };
     auto end1 = std::chrono::steady_clock::now();
-    auto ns1 = std::chrono::duration_cast<std::chrono::nanoseconds>(end1 - start1).count();
+    auto ns1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1).count();
     
 
     // took 2356132504ns for int M = 512, N = 1024, P = 1536;
@@ -112,16 +112,19 @@ int main() {
     // };
     // auto end2 = std::chrono::steady_clock::now();
     // auto ns2 = std::chrono::duration_cast<std::chrono::nanoseconds>(end2 - start2).count();
-
-    const int tile_size = 16;
-    auto start3 = std::chrono::steady_clock::now();
-    // tile the matrix, no transpose
+    
     std::vector<float> mat3 = transpose(mat2, N, P);
+
+    const int tile_size = 32;
+    auto start3 = std::chrono::steady_clock::now();
+
+    // tile the matrix, with transpose
 
     auto tiledM = M / tile_size;
     auto tiledN = N / tile_size;
     auto tiledP = P / tile_size;
 
+    #pragma omp parallel for collapse(2) num_threads(10)
     for(int i = 0; i < tiledM; i ++) {
         for(int j = 0; j < tiledP; j++) {
             for(int k = 0; k < tiledN; k++) {
@@ -137,6 +140,7 @@ int main() {
     
                 for(int ii = 0; ii < tile_size; ii++) {
                     for(int jj = 0; jj < tile_size; jj++) {
+                        float sum = res3[(i*tile_size+ii) * P + (j*tile_size+jj)];
                         for(int kk = 0; kk < tile_size; kk++) {
                             // general formula for an element at row r and col c in a matrix with num_cols columns: r * num_cols + c
                             // for row, i * tile_size gives us the row the tile is in and then ii tells us which row within the tile
@@ -154,16 +158,27 @@ int main() {
 
                             // std::cout << "A: " << (i*tile_size + ii) * N + (k*tile_size + kk) << "| B: " << (k*tile_size + kk) * P + (j*tile_size + jj) << std::endl;
                             // res3[(i*tile_size+ii) * P + (j*tile_size+jj)] += mat1[(i*tile_size + ii) * N + (k*tile_size + kk)] * mat2[(k*tile_size + kk) * P + (j*tile_size + jj)];
-                            res3[(i*tile_size+ii) * P + (j*tile_size+jj)] += mat1[(i*tile_size + ii) * N + (k*tile_size + kk)] * mat3[(j*tile_size + jj) * P + (k*tile_size + kk)];
+                            sum += mat1[(i*tile_size + ii) * N + (k*tile_size + kk)] * mat3[(j*tile_size + jj) * P + (k*tile_size + kk)];
                         }
+                        res3[(i*tile_size+ii) * P + (j*tile_size+jj)] = sum;
                     }
                 }
+
+                // for(int ii = 0; ii < tile_size; ii++) {
+                //     for(int kk = 0; kk < tile_size; kk++) {
+                //         float a = mat1[(i*tile_size + ii) * N + (k*tile_size + kk)];
+                //         for(int jj = 0; jj < tile_size; jj++) {
+                //             res3[(i*tile_size+ii) * P + (j*tile_size+jj)] += a * mat2[(k*tile_size + kk) * P + (j*tile_size + jj)];
+                //         }
+                //     }
+                // }
+
                 // std::cout << "-------------------------------\n";
             }
         }
     }
     auto end3 = std::chrono::steady_clock::now();
-    auto ns3 = std::chrono::duration_cast<std::chrono::nanoseconds>(end3 - start3).count();
+    auto ns3 = std::chrono::duration_cast<std::chrono::milliseconds>(end3 - start3).count();
 
     // for (const auto& x : res1) {
     //     std::cout << x << " ";
