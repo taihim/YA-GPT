@@ -2,7 +2,8 @@
 #include <vector>
 #include <chrono>
 #include <random>
-// #include <cblas.h>
+#include <omp.h>
+#include <cblas.h>
 
 // The key intuition is just one sentence:
 // Element (i, j) of the result is the dot product of row i from A and column j from B.
@@ -65,38 +66,51 @@ int main() {
     std::vector<float> res3(M * P, 0);
 
 
-    // auto start1 = std::chrono::steady_clock::now();
-    // cblas_sgemm(
-    //     CblasRowMajor,
-    //     CblasNoTrans,
-    //     CblasNoTrans,
-    //     M,
-    //     P,
-    //     N,
-    //     1.0f,
-    //     mat1.data(),
-    //     N,
-    //     mat2.data(),
-    //     P,
-    //     0.0f,
-    //     res1.data(),
-    //     P
-    // );
-    // auto end1 = std::chrono::steady_clock::now();
-    // auto ns1 = std::chrono::duration_cast<std::chrono::nanoseconds>(end1 - start1).count();
+    auto start1 = std::chrono::steady_clock::now();
+    cblas_sgemm(
+        CblasRowMajor,
+        CblasNoTrans,
+        CblasNoTrans,
+        M,
+        P,
+        N,
+        1.0f,
+        mat1.data(),
+        N,
+        mat2.data(),
+        P,
+        0.0f,
+        res1.data(),
+        P
+    );
+    auto end1 = std::chrono::steady_clock::now();
+    auto ns1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1).count();
 
 
     // took 3320710669 ns for int M = 512, N = 1024, P = 1536;
-    auto start1 = std::chrono::steady_clock::now();
+    // auto start1 = std::chrono::steady_clock::now();
+    // for(int i = 0; i < M; i ++) {
+    //     for(int j = 0; j < P; j++) {
+    //         for(int k = 0; k < N; k++) {
+    //             res1[i * P + j] += mat1[i * N + k] * mat2[k * P + j];
+    //         };
+    //     };
+    // };
+    // auto end1 = std::chrono::steady_clock::now();
+    // auto ns1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1).count();
+
+    // outer product method
+    auto start2 = std::chrono::steady_clock::now();
+    #pragma omp parallel for
     for(int i = 0; i < M; i ++) {
-        for(int j = 0; j < P; j++) {
-            for(int k = 0; k < N; k++) {
-                res1[i * P + j] += mat1[i * N + k] * mat2[k * P + j];
+        for(int k = 0; k < N; k++) {
+            for(int j = 0; j < P; j++) {
+                res2[i * P + j] += mat1[i * N + k] * mat2[k * P + j];
             };
         };
     };
-    auto end1 = std::chrono::steady_clock::now();
-    auto ns1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1).count();
+    auto end2 = std::chrono::steady_clock::now();
+    auto ns2 = std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2).count();
     
 
     // took 2356132504ns for int M = 512, N = 1024, P = 1536;
@@ -124,7 +138,7 @@ int main() {
     auto tiledN = N / tile_size;
     auto tiledP = P / tile_size;
 
-    #pragma omp parallel for collapse(2) num_threads(10)
+    #pragma omp parallel for collapse(2)
     for(int i = 0; i < tiledM; i ++) {
         for(int j = 0; j < tiledP; j++) {
             for(int k = 0; k < tiledN; k++) {
@@ -140,7 +154,11 @@ int main() {
     
                 for(int ii = 0; ii < tile_size; ii++) {
                     for(int jj = 0; jj < tile_size; jj++) {
-                        float sum = res3[(i*tile_size+ii) * P + (j*tile_size+jj)];
+                        const int aBase = (i * tile_size + ii) * N + k * tile_size;
+                        const int bBase = (j * tile_size + jj) * N + k * tile_size;
+                        float sum = res3[(i * tile_size + ii) * P + (j * tile_size + jj)];
+                        
+                        // #pragma omp simd reduction(+:sum)
                         for(int kk = 0; kk < tile_size; kk++) {
                             // general formula for an element at row r and col c in a matrix with num_cols columns: r * num_cols + c
                             // for row, i * tile_size gives us the row the tile is in and then ii tells us which row within the tile
@@ -158,9 +176,11 @@ int main() {
 
                             // std::cout << "A: " << (i*tile_size + ii) * N + (k*tile_size + kk) << "| B: " << (k*tile_size + kk) * P + (j*tile_size + jj) << std::endl;
                             // res3[(i*tile_size+ii) * P + (j*tile_size+jj)] += mat1[(i*tile_size + ii) * N + (k*tile_size + kk)] * mat2[(k*tile_size + kk) * P + (j*tile_size + jj)];
-                            sum += mat1[(i*tile_size + ii) * N + (k*tile_size + kk)] * mat3[(j*tile_size + jj) * P + (k*tile_size + kk)];
+                            // sum += mat1[(i*tile_size + ii) * N + (k*tile_size + kk)] * mat3[(j*tile_size + jj) * N + (k*tile_size + kk)];
+                            sum += mat1[aBase + kk] * mat3[bBase + kk];
                         }
                         res3[(i*tile_size+ii) * P + (j*tile_size+jj)] = sum;
+                        // res3[row * P + column] = sum;
                     }
                 }
 
@@ -183,25 +203,25 @@ int main() {
     // for (const auto& x : res1) {
     //     std::cout << x << " ";
     // };
-    std::cout << std::endl;
-    std::cout << "Time taken matmul standard: " << ns1 << std::endl;
+    // std::cout << std::endl;
+    // std::cout << "Time taken matmul standard: " << ns1 << std::endl;
 
     // for (const auto& x : res2) {
     //     std::cout << x << " ";
     // };
     
-    // std::cout << std::endl;
-    // std::cout << "Time taken matmul cblas: " << ns1 << std::endl;
+    std::cout << std::endl;
+    std::cout << "Time taken matmul cblas: " << ns1 << std::endl;
 
-    // std::cout << std::endl;
-    // std::cout << "Time taken matmul transposed: " << ns2 << std::endl;
+    std::cout << std::endl;
+    std::cout << "Time taken matmul outerproduct: " << ns2 << std::endl;
 
     std::cout << std::endl;
     std::cout << "Time taken matmul tiled: " << ns3 << std::endl;
     
-    const auto eps = 1e-5f;
+    const auto eps = 1e-8f;
     for (int i = 0; i < M * P; i++) {
-        if(abs(res1[i] - res3[i]) <= eps){
+        if(std::abs(res2[i] - res3[i]) <= eps){
             continue;
         }
         std::cout << "Results not equal" << std::endl;

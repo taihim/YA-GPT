@@ -35,12 +35,14 @@
               python
               cudaNvcc
               pkgs.clang
+              pkgs.llvmPackages.openmp
               pkgs.cmake
               pkgs.ninja
               pkgs.uv
               pkgs.git
               pkgs.pkg-config
               pkgs.zlib
+              pkgs.openblas
               pkgs.stdenv.cc.cc.lib
             ];
 
@@ -50,6 +52,7 @@
             TRITON_PTXAS_PATH = "${cudaNvcc}/bin/ptxas";
             LD_LIBRARY_PATH = nixpkgs.lib.makeLibraryPath [
               pkgs.zlib
+              pkgs.openblas
               pkgs.stdenv.cc.cc.lib
             ] + ":/run/opengl-driver/lib";
 
