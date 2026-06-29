@@ -56,7 +56,7 @@ int main() {
     // std::vector<float> mat1 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}; // 4x4
     // std::vector<float> mat2 = {17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}; // 4x4
     
-    int M = 1024, N = 1024, P = 1024;
+    int M = 4096, N = 4096, P = 4096;
     
     std::vector<float> mat1 = gen_matrix(M, N);
     std::vector<float> mat2 = gen_matrix(N, P);
