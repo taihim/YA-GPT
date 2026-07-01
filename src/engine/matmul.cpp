@@ -286,13 +286,13 @@ int main() {
     
     const auto eps = 1e-5f;
     for (int i = 0; i < M * P; i++) {
-        float diff = std::abs(res2[i] - res3[i]);
-        float largest = std::max(std::abs(res2[i]), std::abs(res3[i]));
+        float diff = std::abs(res1[i] - res2[i]);
+        float largest = std::max(std::abs(res1[i]), std::abs(res2[i]));
         
         // If numbers are very close to 0, use absolute error; otherwise, use relative error
         if (diff > eps && (diff / largest) > eps) {
             std::cout << "Results not equal at index " << i 
-                    << " (res2: " << res2[i] << ", res3: " << res3[i] << ")" << std::endl;
+                    << " (res1: " << res1[i] << ", res2: " << res2[i] << ")" << std::endl;
             return 0;
     }
 }
