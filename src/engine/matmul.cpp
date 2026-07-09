@@ -107,9 +107,10 @@ int main() {
     // int M = 4, N = 4, P = 4;
     // std::vector<float> mat1 = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}; // 4x4
     // std::vector<float> mat2 = {17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32}; // 4x4
-    constexpr int M = 2048;
-    constexpr int N = 2048;
-    constexpr int P = 2048;
+    constexpr int M = 8192;
+    constexpr int N = 8192;
+    constexpr int P = 8192;
+    double total_gflops_ops = (2.0 * M * N * P) / 1e9;
     // int M = 4096, N = 4096, P = 4096;
     
     std::vector<float> mat1 = gen_matrix(M, N);
@@ -139,7 +140,7 @@ int main() {
     );
     auto end1 = std::chrono::steady_clock::now();
     auto ns1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1).count();
-
+    double cblas_gflops = total_gflops_ops / (ns1 / 1000.0);
 
     // took 3320710669 ns for int M = 512, N = 1024, P = 1536;
     // auto start1 = std::chrono::steady_clock::now();
@@ -182,95 +183,6 @@ int main() {
     // };
 
 
-    // #pragma omp parallel for collapse(2)
-    // for (int tileI = 0; tileI < M; tileI += macro_tile_size) {
-    //     for (int tileJ = 0; tileJ < P; tileJ += macro_tile_size) {
-    //         for (int tileK = 0; tileK < N; tileK += tile_size) {
-                
-    //             int iEnd = std::min(M, tileI + macro_tile_size);
-    //             int jEnd = std::min(P, tileJ + macro_tile_size);
-    //             int kEnd = std::min(N, tileK + tile_size);
-                
-    //             // --- AVX2 Register Tiled Kernel (6 rows x 8 columns) ---
-    //             int i = tileI;
-    //             for (; i <= iEnd - 6; i += 6) {
-    //                 int j = tileJ;
-    //                 for (; j <= jEnd - 8; j += 8) {
-                        
-    //                     // 1. Load the 6x8 block of accumulation data into 256-bit registers
-    //                     __m256 c0 = _mm256_loadu_ps(&res2[(i + 0) * P + j]);
-    //                     __m256 c1 = _mm256_loadu_ps(&res2[(i + 1) * P + j]);
-    //                     __m256 c2 = _mm256_loadu_ps(&res2[(i + 2) * P + j]);
-    //                     __m256 c3 = _mm256_loadu_ps(&res2[(i + 3) * P + j]);
-    //                     __m256 c4 = _mm256_loadu_ps(&res2[(i + 4) * P + j]);
-    //                     __m256 c5 = _mm256_loadu_ps(&res2[(i + 5) * P + j]);
-
-    //                     // 2. Inner K loop: Accumulate entirely inside registers
-    //                     for (int k = tileK; k < kEnd; k++) {
-    //                         // Load 8 elements from mat2 (Row k)
-    //                         __m256 b = _mm256_loadu_ps(&mat2[k * P + j]);
-
-    //                         // Broadcast 1 element from mat1 for each of the 6 rows
-    //                         __m256 a0 = _mm256_set1_ps(mat1[(i + 0) * N + k]);
-    //                         __m256 a1 = _mm256_set1_ps(mat1[(i + 1) * N + k]);
-    //                         __m256 a2 = _mm256_set1_ps(mat1[(i + 2) * N + k]);
-    //                         __m256 a3 = _mm256_set1_ps(mat1[(i + 3) * N + k]);
-    //                         __m256 a4 = _mm256_set1_ps(mat1[(i + 4) * N + k]);
-    //                         __m256 a5 = _mm256_set1_ps(mat1[(i + 5) * N + k]);
-
-    //                         // AVX2 Fused Multiply-Add
-    //                         c0 = _mm256_fmadd_ps(a0, b, c0);
-    //                         c1 = _mm256_fmadd_ps(a1, b, c1);
-    //                         c2 = _mm256_fmadd_ps(a2, b, c2);
-    //                         c3 = _mm256_fmadd_ps(a3, b, c3);
-    //                         c4 = _mm256_fmadd_ps(a4, b, c4);
-    //                         c5 = _mm256_fmadd_ps(a5, b, c5);
-    //                     }
-
-    //                     // 3. Write back to memory ONCE
-    //                     _mm256_storeu_ps(&res2[(i + 0) * P + j], c0);
-    //                     _mm256_storeu_ps(&res2[(i + 1) * P + j], c1);
-    //                     _mm256_storeu_ps(&res2[(i + 2) * P + j], c2);
-    //                     _mm256_storeu_ps(&res2[(i + 3) * P + j], c3);
-    //                     _mm256_storeu_ps(&res2[(i + 4) * P + j], c4);
-    //                     _mm256_storeu_ps(&res2[(i + 5) * P + j], c5);
-    //                 }
-
-    //                 // Cleanup loop for J if it doesn't align to 8 elements
-    //                 for (; j < jEnd; j++) {
-    //                     for (int r = 0; r < 6; r++) {
-    //                         float sum = 0.0f;
-    //                         for (int k = tileK; k < kEnd; k++) {
-    //                             sum += mat1[(i + r) * N + k] * mat2[k * P + j];
-    //                         }
-    //                         res2[(i + r) * P + j] += sum;
-    //                     }
-    //                 }
-    //             }
-
-    //             // Cleanup loop for I if it doesn't align to 6 elements
-    //             for (; i < iEnd; i++) {
-    //                 for (int k = tileK; k < kEnd; k++) {
-    //                     float mat1_val = mat1[i * N + k];
-    //                     int j = tileJ;
-    //                     for (; j <= jEnd - 8; j += 8) {
-    //                         __m256 c = _mm256_loadu_ps(&res2[i * P + j]);
-    //                         __m256 b = _mm256_loadu_ps(&mat2[k * P + j]);
-    //                         __m256 a = _mm256_set1_ps(mat1_val);
-    //                         c = _mm256_fmadd_ps(a, b, c);
-    //                         _mm256_storeu_ps(&res2[i * P + j], c);
-    //                     }
-    //                     for (; j < jEnd; j++) {
-    //                         res2[i * P + j] += mat1_val * mat2[k * P + j];
-    //                     }
-    //                 }
-    //             }
-
-    //         }
-    //     }
-    // }
-
-
     #pragma omp parallel for collapse(2)
     for (int tileI = 0; tileI < M; tileI += macro_tile_size) {
         for (int tileJ = 0; tileJ < P; tileJ += macro_tile_size) {
@@ -280,99 +192,188 @@ int main() {
                 int jEnd = std::min(P, tileJ + macro_tile_size);
                 int kEnd = std::min(N, tileK + tile_size);
                 
-                // --- Register Tiled Kernel (4 rows at a time, 16 columns at a time) ---
+                // --- AVX2 Register Tiled Kernel (6 rows x 8 columns) ---
                 int i = tileI;
-                for (; i <= iEnd - 8; i += 8) {
+                for (; i <= iEnd - 6; i += 6) {
                     int j = tileJ;
-                    for (; j <= jEnd - 16; j += 16) {
+                    for (; j <= jEnd - 8; j += 8) {
                         
-                        // 1. Load the 4x16 block of accumulation data into 512-bit registers
-                        __m512 c0 = _mm512_loadu_ps(&res2[(i + 0) * P + j]);
-                        __m512 c1 = _mm512_loadu_ps(&res2[(i + 1) * P + j]);
-                        __m512 c2 = _mm512_loadu_ps(&res2[(i + 2) * P + j]);
-                        __m512 c3 = _mm512_loadu_ps(&res2[(i + 3) * P + j]);
-
-                        __m512 c4 = _mm512_loadu_ps(&res2[(i + 4) * P + j]);
-                        __m512 c5 = _mm512_loadu_ps(&res2[(i + 5) * P + j]);
-                        __m512 c6 = _mm512_loadu_ps(&res2[(i + 6) * P + j]);
-                        __m512 c7 = _mm512_loadu_ps(&res2[(i + 7) * P + j]);
+                        // 1. Load the 6x8 block of accumulation data into 256-bit registers
+                        __m256 c0 = _mm256_loadu_ps(&res2[(i + 0) * P + j]);
+                        __m256 c1 = _mm256_loadu_ps(&res2[(i + 1) * P + j]);
+                        __m256 c2 = _mm256_loadu_ps(&res2[(i + 2) * P + j]);
+                        __m256 c3 = _mm256_loadu_ps(&res2[(i + 3) * P + j]);
+                        __m256 c4 = _mm256_loadu_ps(&res2[(i + 4) * P + j]);
+                        __m256 c5 = _mm256_loadu_ps(&res2[(i + 5) * P + j]);
 
                         // 2. Inner K loop: Accumulate entirely inside registers
                         for (int k = tileK; k < kEnd; k++) {
-                            // Load 16 elements from mat2 (Row k)
-                            __m512 b = _mm512_loadu_ps(&mat2[k * P + j]);
+                            // Load 8 elements from mat2 (Row k)
+                            __m256 b = _mm256_loadu_ps(&mat2[k * P + j]);
 
-                            // Broadcast 1 element from mat1 for each of the 4 rows
-                            __m512 a0 = _mm512_set1_ps(mat1[(i + 0) * N + k]);
-                            __m512 a1 = _mm512_set1_ps(mat1[(i + 1) * N + k]);
-                            __m512 a2 = _mm512_set1_ps(mat1[(i + 2) * N + k]);
-                            __m512 a3 = _mm512_set1_ps(mat1[(i + 3) * N + k]);
+                            // Broadcast 1 element from mat1 for each of the 6 rows
+                            __m256 a0 = _mm256_set1_ps(mat1[(i + 0) * N + k]);
+                            __m256 a1 = _mm256_set1_ps(mat1[(i + 1) * N + k]);
+                            __m256 a2 = _mm256_set1_ps(mat1[(i + 2) * N + k]);
+                            __m256 a3 = _mm256_set1_ps(mat1[(i + 3) * N + k]);
+                            __m256 a4 = _mm256_set1_ps(mat1[(i + 4) * N + k]);
+                            __m256 a5 = _mm256_set1_ps(mat1[(i + 5) * N + k]);
 
-                            __m512 a4 = _mm512_set1_ps(mat1[(i + 4) * N + k]);
-                            __m512 a5 = _mm512_set1_ps(mat1[(i + 5) * N + k]);
-                            __m512 a6 = _mm512_set1_ps(mat1[(i + 6) * N + k]);
-                            __m512 a7 = _mm512_set1_ps(mat1[(i + 7) * N + k]);
-
-                            // Fused Multiply-Add: c = a * b + c
-                            c0 = _mm512_fmadd_ps(a0, b, c0);
-                            c1 = _mm512_fmadd_ps(a1, b, c1);
-                            c2 = _mm512_fmadd_ps(a2, b, c2);
-                            c3 = _mm512_fmadd_ps(a3, b, c3);
-                            c4 = _mm512_fmadd_ps(a4, b, c4);
-                            c5 = _mm512_fmadd_ps(a5, b, c5);
-                            c6 = _mm512_fmadd_ps(a6, b, c6);
-                            c7 = _mm512_fmadd_ps(a7, b, c7);
+                            // AVX2 Fused Multiply-Add
+                            c0 = _mm256_fmadd_ps(a0, b, c0);
+                            c1 = _mm256_fmadd_ps(a1, b, c1);
+                            c2 = _mm256_fmadd_ps(a2, b, c2);
+                            c3 = _mm256_fmadd_ps(a3, b, c3);
+                            c4 = _mm256_fmadd_ps(a4, b, c4);
+                            c5 = _mm256_fmadd_ps(a5, b, c5);
                         }
 
-                        // 3. Write the finalized 4x16 block back to memory ONCE
-                        _mm512_storeu_ps(&res2[(i + 0) * P + j], c0);
-                        _mm512_storeu_ps(&res2[(i + 1) * P + j], c1);
-                        _mm512_storeu_ps(&res2[(i + 2) * P + j], c2);
-                        _mm512_storeu_ps(&res2[(i + 3) * P + j], c3);
-
-                        _mm512_storeu_ps(&res2[(i + 4) * P + j], c4);
-                        _mm512_storeu_ps(&res2[(i + 5) * P + j], c5);
-                        _mm512_storeu_ps(&res2[(i + 6) * P + j], c6);
-                        _mm512_storeu_ps(&res2[(i + 7) * P + j], c7);
+                        // 3. Write back to memory ONCE
+                        _mm256_storeu_ps(&res2[(i + 0) * P + j], c0);
+                        _mm256_storeu_ps(&res2[(i + 1) * P + j], c1);
+                        _mm256_storeu_ps(&res2[(i + 2) * P + j], c2);
+                        _mm256_storeu_ps(&res2[(i + 3) * P + j], c3);
+                        _mm256_storeu_ps(&res2[(i + 4) * P + j], c4);
+                        _mm256_storeu_ps(&res2[(i + 5) * P + j], c5);
                     }
 
-                    // // Extra cleanup loop for J if macro_tile_size or P is not a multiple of 16
-                    // for (; j < jEnd; j++) {
-                    //     for (int r = 0; r < 4; r++) {
-                    //         float sum = 0.0f;
-                    //         for (int k = tileK; k < kEnd; k++) {
-                    //             sum += mat1[(i + r) * N + k] * mat2[k * P + j];
-                    //         }
-                    //         res2[(i + r) * P + j] += sum;
-                    //     }
-                    // }
+                    // Cleanup loop for J if it doesn't align to 8 elements
+                    for (; j < jEnd; j++) {
+                        for (int r = 0; r < 6; r++) {
+                            float sum = 0.0f;
+                            for (int k = tileK; k < kEnd; k++) {
+                                sum += mat1[(i + r) * N + k] * mat2[k * P + j];
+                            }
+                            res2[(i + r) * P + j] += sum;
+                        }
+                    }
                 }
 
-                // // Extra cleanup loop for I if macro_tile_size or M is not a multiple of 4
-                // for (; i < iEnd; i++) {
-                //     for (int k = tileK; k < kEnd; k++) {
-                //         float mat1_val = mat1[i * N + k];
-                //         int j = tileJ;
-                //         for (; j <= jEnd - 16; j += 16) {
-                //             __m512 c = _mm512_loadu_ps(&res2[i * P + j]);
-                //             __m512 b = _mm512_loadu_ps(&mat2[k * P + j]);
-                //             __m512 a = _mm512_set1_ps(mat1_val);
-                //             c = _mm512_fmadd_ps(a, b, c);
-                //             _mm512_storeu_ps(&res2[i * P + j], c);
-                //         }
-                //         for (; j < jEnd; j++) {
-                //             res2[i * P + j] += mat1_val * mat2[k * P + j];
-                //         }
-                //     }
-                // }
+                // Cleanup loop for I if it doesn't align to 6 elements
+                for (; i < iEnd; i++) {
+                    for (int k = tileK; k < kEnd; k++) {
+                        float mat1_val = mat1[i * N + k];
+                        int j = tileJ;
+                        for (; j <= jEnd - 8; j += 8) {
+                            __m256 c = _mm256_loadu_ps(&res2[i * P + j]);
+                            __m256 b = _mm256_loadu_ps(&mat2[k * P + j]);
+                            __m256 a = _mm256_set1_ps(mat1_val);
+                            c = _mm256_fmadd_ps(a, b, c);
+                            _mm256_storeu_ps(&res2[i * P + j], c);
+                        }
+                        for (; j < jEnd; j++) {
+                            res2[i * P + j] += mat1_val * mat2[k * P + j];
+                        }
+                    }
+                }
 
             }
         }
     }
+
+
+    // #pragma omp parallel for collapse(2)
+    // for (int tileI = 0; tileI < M; tileI += macro_tile_size) {
+    //     for (int tileJ = 0; tileJ < P; tileJ += macro_tile_size) {
+    //         for (int tileK = 0; tileK < N; tileK += tile_size) {
+                
+    //             int iEnd = std::min(M, tileI + macro_tile_size);
+    //             int jEnd = std::min(P, tileJ + macro_tile_size);
+    //             int kEnd = std::min(N, tileK + tile_size);
+                
+    //             // --- Register Tiled Kernel (4 rows at a time, 16 columns at a time) ---
+    //             int i = tileI;
+    //             for (; i <= iEnd - 8; i += 8) {
+    //                 int j = tileJ;
+    //                 for (; j <= jEnd - 16; j += 16) {
+                        
+    //                     // 1. Load the 4x16 block of accumulation data into 512-bit registers
+    //                     __m512 c0 = _mm512_loadu_ps(&res2[(i + 0) * P + j]);
+    //                     __m512 c1 = _mm512_loadu_ps(&res2[(i + 1) * P + j]);
+    //                     __m512 c2 = _mm512_loadu_ps(&res2[(i + 2) * P + j]);
+    //                     __m512 c3 = _mm512_loadu_ps(&res2[(i + 3) * P + j]);
+
+    //                     __m512 c4 = _mm512_loadu_ps(&res2[(i + 4) * P + j]);
+    //                     __m512 c5 = _mm512_loadu_ps(&res2[(i + 5) * P + j]);
+    //                     __m512 c6 = _mm512_loadu_ps(&res2[(i + 6) * P + j]);
+    //                     __m512 c7 = _mm512_loadu_ps(&res2[(i + 7) * P + j]);
+
+    //                     // 2. Inner K loop: Accumulate entirely inside registers
+    //                     for (int k = tileK; k < kEnd; k++) {
+    //                         // Load 16 elements from mat2 (Row k)
+    //                         __m512 b = _mm512_loadu_ps(&mat2[k * P + j]);
+
+    //                         // Broadcast 1 element from mat1 for each of the 4 rows
+    //                         __m512 a0 = _mm512_set1_ps(mat1[(i + 0) * N + k]);
+    //                         __m512 a1 = _mm512_set1_ps(mat1[(i + 1) * N + k]);
+    //                         __m512 a2 = _mm512_set1_ps(mat1[(i + 2) * N + k]);
+    //                         __m512 a3 = _mm512_set1_ps(mat1[(i + 3) * N + k]);
+
+    //                         __m512 a4 = _mm512_set1_ps(mat1[(i + 4) * N + k]);
+    //                         __m512 a5 = _mm512_set1_ps(mat1[(i + 5) * N + k]);
+    //                         __m512 a6 = _mm512_set1_ps(mat1[(i + 6) * N + k]);
+    //                         __m512 a7 = _mm512_set1_ps(mat1[(i + 7) * N + k]);
+
+    //                         // Fused Multiply-Add: c = a * b + c
+    //                         c0 = _mm512_fmadd_ps(a0, b, c0);
+    //                         c1 = _mm512_fmadd_ps(a1, b, c1);
+    //                         c2 = _mm512_fmadd_ps(a2, b, c2);
+    //                         c3 = _mm512_fmadd_ps(a3, b, c3);
+    //                         c4 = _mm512_fmadd_ps(a4, b, c4);
+    //                         c5 = _mm512_fmadd_ps(a5, b, c5);
+    //                         c6 = _mm512_fmadd_ps(a6, b, c6);
+    //                         c7 = _mm512_fmadd_ps(a7, b, c7);
+    //                     }
+
+    //                     // 3. Write the finalized 4x16 block back to memory ONCE
+    //                     _mm512_storeu_ps(&res2[(i + 0) * P + j], c0);
+    //                     _mm512_storeu_ps(&res2[(i + 1) * P + j], c1);
+    //                     _mm512_storeu_ps(&res2[(i + 2) * P + j], c2);
+    //                     _mm512_storeu_ps(&res2[(i + 3) * P + j], c3);
+
+    //                     _mm512_storeu_ps(&res2[(i + 4) * P + j], c4);
+    //                     _mm512_storeu_ps(&res2[(i + 5) * P + j], c5);
+    //                     _mm512_storeu_ps(&res2[(i + 6) * P + j], c6);
+    //                     _mm512_storeu_ps(&res2[(i + 7) * P + j], c7);
+    //                 }
+
+    //                 // // Extra cleanup loop for J if macro_tile_size or P is not a multiple of 16
+    //                 // for (; j < jEnd; j++) {
+    //                 //     for (int r = 0; r < 4; r++) {
+    //                 //         float sum = 0.0f;
+    //                 //         for (int k = tileK; k < kEnd; k++) {
+    //                 //             sum += mat1[(i + r) * N + k] * mat2[k * P + j];
+    //                 //         }
+    //                 //         res2[(i + r) * P + j] += sum;
+    //                 //     }
+    //                 // }
+    //             }
+
+    //             // // Extra cleanup loop for I if macro_tile_size or M is not a multiple of 4
+    //             // for (; i < iEnd; i++) {
+    //             //     for (int k = tileK; k < kEnd; k++) {
+    //             //         float mat1_val = mat1[i * N + k];
+    //             //         int j = tileJ;
+    //             //         for (; j <= jEnd - 16; j += 16) {
+    //             //             __m512 c = _mm512_loadu_ps(&res2[i * P + j]);
+    //             //             __m512 b = _mm512_loadu_ps(&mat2[k * P + j]);
+    //             //             __m512 a = _mm512_set1_ps(mat1_val);
+    //             //             c = _mm512_fmadd_ps(a, b, c);
+    //             //             _mm512_storeu_ps(&res2[i * P + j], c);
+    //             //         }
+    //             //         for (; j < jEnd; j++) {
+    //             //             res2[i * P + j] += mat1_val * mat2[k * P + j];
+    //             //         }
+    //             //     }
+    //             // }
+
+    //         }
+    //     }
+    // }
     // run_tiled_matmul<M, N, P>(mat1.data(), mat2.data(), res2.data());
     auto end2 = std::chrono::steady_clock::now();
     auto ns2 = std::chrono::duration_cast<std::chrono::milliseconds>(end2 - start2).count();
-    
+    double my_gflops = total_gflops_ops / (ns2 / 1000.0);
 
     // took 2356132504ns for int M = 512, N = 1024, P = 1536;
     // auto start2 = std::chrono::steady_clock::now();
@@ -471,6 +472,8 @@ int main() {
     std::cout << std::endl;
     std::cout << "Time taken matmul outerproduct: " << ns2 << std::endl;
 
+    std::cout << "CBLAS Performance: " << cblas_gflops << " GFLOPS" << std::endl;
+    std::cout << "My Kernel Performance: " << my_gflops << " GFLOPS" << std::endl;
     // std::cout << std::endl;
     // std::cout << "Time taken matmul tiled: " << ns3 << std::endl;
     
@@ -485,7 +488,7 @@ int main() {
                     << " (res1: " << res1[i] << ", res2: " << res2[i] << ")" << std::endl;
             return 0;
     }
-}
+    }
     std::cout << "Results equal" << std::endl;
     
     return 0;
