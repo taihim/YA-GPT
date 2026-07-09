@@ -183,7 +183,7 @@ int main() {
     // };
 
 
-    #pragma omp parallel for collapse(2)
+    #pragma omp parallel for collapse(2) schedule(guided, 4)
     for (int tileI = 0; tileI < M; tileI += macro_tile_size) {
         for (int tileJ = 0; tileJ < P; tileJ += macro_tile_size) {
             for (int tileK = 0; tileK < N; tileK += tile_size) {
@@ -208,6 +208,11 @@ int main() {
 
                         // 2. Inner K loop: Accumulate entirely inside registers
                         for (int k = tileK; k < kEnd; k++) {
+                            // Only issue the prefetch instruction every 4 loops to avoid pipeline bloat
+                            if ((k & 3) == 0) {
+                                _mm_prefetch((const char*)&mat2[(k + 4) * P + j], _MM_HINT_T0);
+                            }
+                            
                             // Load 8 elements from mat2 (Row k)
                             __m256 b = _mm256_loadu_ps(&mat2[k * P + j]);
 
