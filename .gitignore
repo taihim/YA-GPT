@@ -9,3 +9,5 @@ __marimo__/
 .agents/
 build/
 *.o
+.vscode
+.basemind

@@ -52,7 +52,7 @@ int main() {
     // std::vector<float> mat1 = gen_matrix(M, N);
     // std::vector<float> mat2 = gen_matrix(N, P);
 
-    std::vector<float> input{1.0, 1.0, 0.0, 0.0};
+    std::vector<float> input{1.0, 0.0, 0.0, 0.0};
     
     std::vector<float> res(M * P, 0);
     std::vector<float> res2(M * P, 0);
